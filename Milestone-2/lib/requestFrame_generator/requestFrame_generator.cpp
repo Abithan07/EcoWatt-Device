@@ -2,11 +2,6 @@
 #include "calculateCRC.h"
 
 String generateRequestFrame(uint8_t slaveAddress, uint8_t functionCode, const std::vector<uint16_t>& registers) {
-    if (functionCode != 0x03 && functionCode != 0x06) {
-        Serial.println("Unsupported function code. Only 0x03 and 0x06 are supported.");
-        return "";
-    }
-
     if (registers.empty()) {
         Serial.println("Register array is empty.");
         return "";
@@ -29,6 +24,9 @@ String generateRequestFrame(uint8_t slaveAddress, uint8_t functionCode, const st
         uint16_t value = registers[1];
 
         snprintf(frameWithoutCRC, sizeof(frameWithoutCRC), "%02X%02X%04X%04X", slaveAddress, functionCode, registerAddress, value);
+    }else {
+        Serial.println("Unsupported function code.");
+        return "";
     }
 
     // Convert the frameWithoutCRC to a string of hex characters
