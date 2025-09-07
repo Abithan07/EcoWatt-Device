@@ -7,6 +7,8 @@
 #include <requestFrame_generator.h>
 #include <vector>
 
+const unsigned long responseTimeout = 2000;
+const int maxRetries = 3;
 
 unsigned long pollTime = 5000;
 unsigned long writeTime = 25000;
@@ -42,6 +44,31 @@ void uploadToDashboard(const std::vector<String>& data) {
     }
     Serial.println("Upload complete.");
 }
+
+
+String sendRequestWithRetry(const String& endpoint, const String& frame) {
+    int retryCount = 0;
+    String result;
+    while (retryCount < maxRetries) {
+        unsigned long startTime = millis();
+        result = api_send_request(endpoint, frame);
+
+        while (result.isEmpty() && millis() - startTime < responseTimeout) {
+            delay(10);
+        }
+
+        if (!result.isEmpty()) {
+            return result;
+        }
+
+        Serial.println("Timeout: No response received. Retrying...");
+        retryCount++;
+    }
+
+    Serial.println("Error: Maximum retries reached. Request failed.");
+    return "Failed";
+}
+
 
 // Function to append CRC to the request frame
 String appendCRC(const String& requestFrameWithoutCRC) {
@@ -115,30 +142,34 @@ void loop() {
       Serial.print("Request Frame for Read: ");
       Serial.println(requestFrame_read);
 
-      String result = api_send_request(endpoint_read, requestFrame_read);
+      String result = sendRequestWithRetry(endpoint_read, requestFrame_read);
       Serial.print("API Response for Read request: ");
       Serial.println(result);
 
       // CRC validation
-      if (checkCRC(result)) {
-        
+      if (result != "Failed" && checkCRC(result)) {
+
         // Store the raw value in sampledRawData
         sampledRawData.push_back(result);
 
         Serial.println("CRC check PASSED for Read request");
         // Decode response
+        Serial.println("Decoding response frame: " + result);
         std::vector<uint16_t> registerValues = decodeResponse(result);
 
-        Serial.println("Processed Register Values:");
-        for (size_t i = 0; i < registerValues.size(); ++i) {
-          float processedValue = registerValues[i] / gains[i];
-          Serial.print("Register ");
-          Serial.print(i);
-          Serial.print(": ");
-          Serial.print(processedValue);
-          Serial.print(" ");
-          Serial.println(units[i]);
-
+        if (!registerValues.empty()) {
+          Serial.println("Processed Register Values:");
+          for (size_t i = 0; i < registerValues.size(); ++i) {
+            float processedValue = registerValues[i] / gains[i];
+            Serial.print("Register ");
+            Serial.print(i);
+            Serial.print(": ");
+            Serial.print(processedValue);
+            Serial.print(" ");
+            Serial.println(units[i]);
+          }
+        } else {
+            Serial.println("Decoding failed.");
         }
       } else {
         Serial.println("CRC check FAILED for Read request");
@@ -158,12 +189,12 @@ void loop() {
       Serial.print("Request Frame for Write: ");
       Serial.println(requestFrame_write);
 
-      String result = api_send_request(endpoint_write, requestFrame_write);
+      String result = sendRequestWithRetry(endpoint_write, requestFrame_write);
       Serial.print("API Response for Write request: ");
       Serial.println(result);
 
       // CRC validation
-      if (checkCRC(result)) {
+      if (result != "Failed" && checkCRC(result)) {
         Serial.println("CRC check PASSED for Write request");
       } else {
         Serial.println("CRC check FAILED for Write request");
