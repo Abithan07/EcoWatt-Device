@@ -69,7 +69,7 @@ def add_data():
 
         if not check_crc(payload):
             return jsonify({"error": "Invalid CRC"}), 400
-        
+
         new_row = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "payload": payload

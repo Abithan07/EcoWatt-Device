@@ -12,7 +12,31 @@ def require_api_key():
 def check_crc(payload):
     """Check if the CRC in the payload is valid."""
     try:
-        # mock function to calculate CRC
-        return True
+        data = [int(payload[i:i+2], 16) for i in range(0, len(payload)-4, 2)]
+        # received crc is the last two bytes of the payload in little-endian format
+        received_crc = int(payload[-2:] + payload[-4:-2], 16)
+        calculated_crc = calculate_crc(data)
+        return calculated_crc == received_crc
     except Exception as e:
         return False
+
+def calculate_crc(data):
+    """
+    Calculate the CRC-16 (Modbus) checksum for the given data.
+
+    Args:
+        data (list of int): The input data as a list of bytes (0-255).
+
+    Returns:
+        int: The calculated CRC value as a 16-bit integer.
+    """
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            if crc & 0x0001:
+                crc >>= 1
+                crc ^= 0xA001
+            else:
+                crc >>= 1
+    return crc & 0xFFFF
