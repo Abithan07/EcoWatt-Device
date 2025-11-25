@@ -8,6 +8,7 @@
 #include <modbus_handler.h>
 #include <encryptionAndSecurity.h>
 #include <boot_validator.h>
+#include <event_logger.h>
 #include "sdkconfig.h"
 #include "esp_pm.h"
 #include "driver/uart.h"
@@ -53,11 +54,21 @@ void setup() {
     
     // Initialize modules
     error_handler_init();
+    
+    // Initialize event logger for persistent error logging
+    if (!init_event_logger()) {
+        Serial.println(F("Event logger initialization failed"));
+        // Non-critical, continue without event logging
+    } else {
+        Serial.println(F("Event logger initialized"));
+    }
+    
     nonceManager.begin();
     
     // Initialize WiFi
     if (!wifi_init()) {
         log_error(ERROR_WIFI_DISCONNECTED, "Failed to initialize WiFi");
+        log_event("WIFI_INIT_FAIL", "Cannot connect to WiFi, restarting");
         Serial.println(F("Failed to initialize WiFi. Restarting in 5 seconds..."));
         delay(WIFI_RETRY_DELAY_MS);
         ESP.restart();
@@ -67,6 +78,7 @@ void setup() {
     // Initialize ConfigManager
     if (!config_manager_init()) {
         Serial.println(F("Failed to initialize ConfigManager"));
+        log_event("CONFIG_INIT_FAIL", "ConfigManager initialization failed");
         // Continue with default configuration
     } else {
         Serial.println(F("ConfigManager initialized successfully"));
@@ -79,6 +91,7 @@ void setup() {
     // Initialize API client
     if (!api_init()) {
         log_error(ERROR_HTTP_FAILED, "Failed to initialize API client");
+        log_event("API_INIT_FAIL", "API client initialization failed");
         Serial.println(F("API client initialization failed"));
     } else {
         Serial.println(F("System initialized successfully"));

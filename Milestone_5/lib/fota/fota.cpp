@@ -3,6 +3,7 @@
 #include "hex_utils.h"
 #include "time_utils.h"
 #include "boot_validator.h"
+#include "event_logger.h"
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <Preferences.h>
@@ -307,6 +308,7 @@ bool perform_FOTA_with_manifest(int job_id,
   // Verify manifest signature
   if (!verifySignature(origManifest, signature, firmwarePublicKey)) {
     Serial.println("[FOTA] Manifest signature invalid");
+    log_event("FOTA_SIGNATURE_FAIL", "job=" + jobIdStr);
     append_fota_event("ERROR", "FOTA_FAIL", "SIGNATURE_INVALID");
     
     unsigned long duration = millis() - startMillis;
@@ -340,6 +342,7 @@ bool perform_FOTA_with_manifest(int job_id,
 
   if (respCode != HTTP_CODE_OK) {
     Serial.printf("[FOTA] HTTP error: %d\n", respCode);
+    log_event("FOTA_DOWNLOAD_FAIL", "HTTP_" + String(respCode) + ",job=" + jobIdStr);
     append_fota_event("ERROR", "FOTA_FAIL", "HTTP_ERROR_" + String(respCode));
     fwHttp.end();
     

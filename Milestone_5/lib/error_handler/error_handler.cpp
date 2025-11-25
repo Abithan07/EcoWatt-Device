@@ -1,6 +1,7 @@
 #include "error_handler.h"
 #include "config.h"
 #include "wifi_manager.h"
+#include "event_logger.h"
 #include <WiFi.h>
 #include <esp_task_wdt.h>
 
@@ -31,6 +32,10 @@ void log_error(error_code_t error_code, const char* message) {
     Serial.print(error_code);
     Serial.print(F("]: "));
     Serial.println(message);
+    
+    // Log to SPIFFS for remote debugging
+    String context = "code=" + String(error_code);
+    log_event(String(message), context);
 }
 
 bool should_retry(error_code_t error_code, int retry_count) {
@@ -92,6 +97,7 @@ void check_system_health(void) {
     // Check error frequency
     if (consecutive_errors > MAX_RETRIES) {
         Serial.println(F("WARNING: High error frequency detected"));
+        log_event("HIGH_ERROR_FREQUENCY", "count=" + String(consecutive_errors));
     }
     
     // Reset error counter periodically

@@ -1,4 +1,5 @@
 #include "boot_validator.h"
+#include "event_logger.h"
 #include <Preferences.h>
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
@@ -14,15 +15,24 @@ void check_boot_loop() {
     if (boot_count >= 3) {
         Serial.println("[BOOT] ⚠️ BOOT LOOP DETECTED - Attempting rollback to previous firmware");
         
+        // Log boot loop detection
+        String context = "count=" + String(boot_count);
+        log_event("BOOT_LOOP_DETECTED", context);
+        
         const esp_partition_t* running = esp_ota_get_running_partition();
         const esp_partition_t* previous = esp_ota_get_next_update_partition(NULL);
         
         Serial.printf("[BOOT] Current partition: %s\n", running->label);
         Serial.printf("[BOOT] Rolling back to: %s\n", previous->label);
         
+        // Log rollback attempt
+        context = "from=" + String(running->label) + ",to=" + String(previous->label);
+        log_event("ROLLBACK_TRIGGERED", context);
+        
         esp_err_t err = esp_ota_set_boot_partition(previous);
         if (err == ESP_OK) {
             Serial.println("[BOOT] ✅ Rollback partition set successfully");
+            log_event("ROLLBACK_SUCCESS", "partition=" + String(previous->label));
             prefs.putInt("boot_count", 0);
             prefs.end();
             Serial.println("[BOOT] Restarting to previous firmware...");
@@ -30,6 +40,7 @@ void check_boot_loop() {
             ESP.restart();
         } else {
             Serial.printf("[BOOT] ❌ Rollback failed: %s\n", esp_err_to_name(err));
+            log_event("ROLLBACK_FAILED", String(esp_err_to_name(err)));
             Serial.println("[BOOT] Device may be in unrecoverable state!");
         }
     }
@@ -49,7 +60,8 @@ void validate_boot_partition() {
             case ESP_OTA_IMG_VALID:
                 Serial.println("VALID (previously verified)");
                 break;
-            case ESP_OTA_IMG_PENDING_VERIFY:
+                
+            case ESP_OTA_IMG_PENDING_VERIFY: {
                 Serial.println("PENDING_VERIFY (new firmware - needs validation)");
                 
                 // Start validation process
@@ -62,12 +74,24 @@ void validate_boot_partition() {
                 Serial.println("[BOOT] ⏳ New firmware detected - validation started");
                 Serial.println("[BOOT] Firmware will be committed after first successful upload");
                 break;
+            }
+            
+            case ESP_OTA_IMG_NEW:
+                Serial.println("NEW (fresh partition, not yet booted)");
+                break;
+                
             case ESP_OTA_IMG_INVALID:
                 Serial.println("INVALID (should not happen - already booted)");
                 break;
+                
             case ESP_OTA_IMG_ABORTED:
                 Serial.println("ABORTED (incomplete update)");
                 break;
+                
+            case ESP_OTA_IMG_UNDEFINED:
+                Serial.println("UNDEFINED (unknown state)");
+                break;
+                
             default:
                 Serial.printf("UNKNOWN (%d)\n", ota_state);
                 break;
@@ -112,6 +136,7 @@ bool commit_firmware_if_pending() {
             esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
             if (err == ESP_OK) {
                 Serial.println("[BOOT] ✅ Firmware marked as VALID - rollback cancelled");
+                log_event("FIRMWARE_COMMITTED", "partition=" + String(running->label));
                 
                 // Reset boot counter - firmware is now stable
                 Preferences prefs;
@@ -124,6 +149,7 @@ bool commit_firmware_if_pending() {
                 return true;
             } else {
                 Serial.printf("[BOOT] ⚠️ Failed to mark firmware valid: %s\n", esp_err_to_name(err));
+                log_event("FIRMWARE_COMMIT_FAIL", String(esp_err_to_name(err)));
                 return false;
             }
         }

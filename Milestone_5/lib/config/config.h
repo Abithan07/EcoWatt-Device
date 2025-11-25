@@ -29,6 +29,12 @@
 // Firmware version tracking for FOTA
 #define FIRMWARE_VERSION "1.0.0"
 
+// Event Logger Configuration (SPIFFS-based persistent logging)
+#define EVENT_LOG_FILE_PATH "/event_log.json"
+#define EVENT_LOG_MAX_SIZE_BYTES 51200  // 50 KB max log file size
+#define EVENT_LOG_RETENTION_HOURS 24    // Keep logs for 24 hours
+#define EVENT_LOG_CLEANUP_INTERVAL_MS 3600000  // Cleanup every 1 hour
+
 // HTTP configuration
 #define HTTP_TIMEOUT_MS 10000
 #define MAX_RETRIES 3

@@ -9,6 +9,7 @@
 #include "fota.h"
 #include "encryptionAndSecurity.h"
 #include "boot_validator.h"
+#include "event_logger.h"
 #include "esp_task_wdt.h"
 #include "command_parse.h"
 #include "time_utils.h"
@@ -37,6 +38,7 @@ static uint32_t last_upload_interval = 0;  // Track config changes
 static uint32_t last_sampling_interval = 0;  // Track config changes
 static unsigned long last_upload_attempt = 0;  // For retry delays
 static int upload_retry_count = 0;  // Track retry attempts
+static unsigned long last_log_cleanup = 0;  // Track last event log cleanup
 
 // Write command tracking
 static command_state_t current_command = {false, 0, 0};
@@ -142,6 +144,13 @@ const PROGMEM uint16_t READ_REGISTERS[READ_REGISTER_COUNT] = {0x0000, 0x0001, 0x
 
 void scheduler_run(void) {
     unsigned long current_time = millis();
+    
+    // Periodic event log cleanup (from config.h: EVENT_LOG_CLEANUP_INTERVAL_MS)
+    if (current_time - last_log_cleanup >= EVENT_LOG_CLEANUP_INTERVAL_MS) {
+        Serial.println(F("[EVENT_LOG] Running periodic cleanup"));
+        cleanup_old_events();
+        last_log_cleanup = current_time;
+    }
     
     // Update task intervals from ConfigManager if available
     if (g_config_manager && g_config_manager->is_initialized()) {
