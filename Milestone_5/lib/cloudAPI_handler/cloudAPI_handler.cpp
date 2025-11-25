@@ -57,10 +57,7 @@ bool parse_config_update_from_response(const String& response, String& config_up
         Serial.println(F("[CONFIG] Configuration update found in response"));
         
         // Create the config update JSON string
-        JsonDocument config_doc;
-        config_doc["config_update"] = doc["config_update"];
-        
-        serializeJson(config_doc, config_update_json);
+        serializeJson(doc["config_update"], config_update_json);
         
         Serial.print(F("[CONFIG] Extracted config update: "));
         Serial.println(config_update_json);
