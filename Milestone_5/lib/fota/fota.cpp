@@ -2,6 +2,7 @@
 #include "config.h"
 #include "hex_utils.h"
 #include "time_utils.h"
+#include "boot_validator.h"
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <Preferences.h>
@@ -470,6 +471,9 @@ bool perform_FOTA_with_manifest(int job_id,
   
   unsigned long duration = millis() - startMillis;
   finalize_and_upload_fota_log(jobIdStr, "SUCCESS", duration);
+  
+  // ===== FOTA ROLLBACK: Reset boot counter before restart =====
+  reset_boot_counter_for_new_firmware();
   
   return true;
 }

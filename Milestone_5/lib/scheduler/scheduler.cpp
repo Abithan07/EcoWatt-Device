@@ -8,6 +8,7 @@
 #include "compressor.h"
 #include "fota.h"
 #include "encryptionAndSecurity.h"
+#include "boot_validator.h"
 #include "esp_task_wdt.h"
 #include "command_parse.h"
 #include "time_utils.h"
@@ -653,6 +654,9 @@ void execute_upload_task(void) {
             Serial.print(F("[UPLOAD] Success: "));
             Serial.print(compressed_data_len + 3);
             Serial.println(F(" bytes uploaded"));
+            
+            // ===== FOTA ROLLBACK: Validate and commit new firmware after first successful upload =====
+            commit_firmware_if_pending();
             
             // STEP 1: Process configuration updates from cloud response
             String config_ack = config_process_cloud_response(response);

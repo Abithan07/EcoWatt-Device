@@ -7,6 +7,7 @@
 #include <scheduler.h>
 #include <modbus_handler.h>
 #include <encryptionAndSecurity.h>
+#include <boot_validator.h>
 #include "sdkconfig.h"
 #include "esp_pm.h"
 #include "driver/uart.h"
@@ -44,6 +45,12 @@ void setup() {
     Serial.begin(SERIAL_BAUD_RATE);
     Serial.println(F("EcoWatt Device - Milestone 5"));
     
+    // ===== STEP 1: Boot Loop Detection =====
+    check_boot_loop();
+    
+    // ===== STEP 2: Firmware Validation Check =====
+    validate_boot_partition();
+    
     // Initialize modules
     error_handler_init();
     nonceManager.begin();
@@ -55,6 +62,7 @@ void setup() {
         delay(WIFI_RETRY_DELAY_MS);
         ESP.restart();
     }
+    mark_validation_checkpoint(1);  // WiFi connected
     
     // Initialize ConfigManager
     if (!config_manager_init()) {
@@ -63,6 +71,7 @@ void setup() {
     } else {
         Serial.println(F("ConfigManager initialized successfully"));
     }
+    mark_validation_checkpoint(2);  // Config loaded
     
     // Configuration is now handled through cloud upload responses
     Serial.println(F("Configuration updates integrated with cloud communication"));
@@ -74,6 +83,7 @@ void setup() {
     } else {
         Serial.println(F("System initialized successfully"));
     }
+    mark_validation_checkpoint(3);  // API initialized
     
     Serial.println(F("Starting main operation loop..."));
     Serial.println();
