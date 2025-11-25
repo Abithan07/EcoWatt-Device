@@ -1,5 +1,6 @@
 #include "encryptionAndSecurity.h"
 #include "config.h"
+#include "hex_utils.h"
 #include <SPIFFS.h>
 #include <mbedtls/base64.h>
 #include <mbedtls/md.h>
@@ -79,16 +80,8 @@ String generateMAC(const uint8_t* payload, size_t length) {
         mac
     );
 
-    // Convert the binary MAC to a hexadecimal string
-    String macHex = "";
-    macHex.reserve(64);
-    for (size_t i = 0; i < sizeof(mac); i++) {
-        if (mac[i] < 0x10) {
-            macHex += "0";
-        }
-        macHex += String(mac[i], HEX);
-    }
-    return macHex;
+    // Convert the binary MAC to a hexadecimal string using hex_utils
+    return bytesToHexString(mac, 32);
 }
 
 /**

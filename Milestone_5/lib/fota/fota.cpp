@@ -1,5 +1,6 @@
 #include "fota.h"
 #include "config.h"
+#include "hex_utils.h"
 #include "time_utils.h"
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -421,12 +422,8 @@ bool perform_FOTA_with_manifest(int job_id,
   mbedtls_sha256_free(&ctx);
   fwHttp.end();
 
-  String computedHash;
-  char hexBuf[3];
-  for (size_t i = 0; i < sizeof(hashBuf); i++) {
-    sprintf(hexBuf, "%02X", hashBuf[i]);
-    computedHash += hexBuf;
-  }
+  // Convert SHA256 hash to hex string using hex_utils
+  String computedHash = bytesToHexString(hashBuf, sizeof(hashBuf));
   
   // Verify hash
   if (!computedHash.equalsIgnoreCase(shaExpected)) {   

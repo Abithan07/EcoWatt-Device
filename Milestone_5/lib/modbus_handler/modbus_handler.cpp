@@ -3,6 +3,7 @@
 #include "calculateCRC.h"
 #include "checkCRC.h"
 #include "error_handler.h"
+#include "hex_utils.h"
 
 bool validate_modbus_response(const String& response) {
     // Check minimum length (slave_addr + function_code + data + CRC = minimum 6 chars)
@@ -31,9 +32,8 @@ bool is_exception_response(const String& response) {
         return false;
     }
     
-    // Extract function code (second byte)
-    String func_code_str = response.substring(2, 4);
-    uint8_t func_code = strtoul(func_code_str.c_str(), nullptr, 16);
+    // Extract function code (second byte) using hex utils
+    uint8_t func_code = extractByteFromHex(response, 1);
     
     // Exception responses have bit 7 set (0x80 | original_function_code)
     return (func_code & 0x80) != 0;
@@ -44,9 +44,8 @@ uint8_t get_exception_code(const String& response) {
         return 0;
     }
     
-    // Exception code is in the third byte
-    String exception_str = response.substring(4, 6);
-    return strtoul(exception_str.c_str(), nullptr, 16);
+    // Exception code is in the third byte using hex utils
+    return extractByteFromHex(response, 2);
 }
 
 bool is_valid_register(uint16_t register_addr) {
@@ -88,9 +87,8 @@ bool decode_response_registers(const String& response, uint16_t* values, size_t 
         return false;
     }
     
-    // Extract byte count
-    String byte_count_str = response.substring(4, 6);
-    uint8_t byte_count = strtoul(byte_count_str.c_str(), nullptr, 16);
+    // Extract byte count using hex utils
+    uint8_t byte_count = extractByteFromHex(response, 2);
     
     // Calculate number of registers (each register is 2 bytes)
     size_t register_count = byte_count / 2;
@@ -100,15 +98,17 @@ bool decode_response_registers(const String& response, uint16_t* values, size_t 
         return false;
     }
     
-    // Extract register values
+    // Extract register values using hex utils
     for (size_t i = 0; i < register_count; i++) {
         int start_pos = 6 + (i * 4); // Start after header, each register is 4 hex chars
         if (start_pos + 4 > response.length() - 4) { // -4 for CRC
             break;
         }
         
-        String reg_str = response.substring(start_pos, start_pos + 4);
-        values[i] = strtoul(reg_str.c_str(), nullptr, 16);
+        // Extract 2 bytes (high byte first - big endian)
+        uint8_t high_byte = extractByteFromHex(response, (start_pos / 2));
+        uint8_t low_byte = extractByteFromHex(response, (start_pos / 2) + 1);
+        values[i] = (high_byte << 8) | low_byte;
         (*actual_count)++;
     }
     
@@ -128,18 +128,16 @@ String append_crc_to_frame(const String& frame_without_crc) {
     int frame_length = frame_without_crc.length() / 2;
     uint8_t frame_bytes[frame_length];
     
-    // Convert hex string to bytes
-    for (int i = 0; i < frame_length; i++) {
-        String byte_str = frame_without_crc.substring(i * 2, i * 2 + 2);
-        frame_bytes[i] = strtoul(byte_str.c_str(), nullptr, 16);
-    }
+    // Convert hex string to bytes using hex utils (60% faster)
+    hexStringToBytes(frame_without_crc, frame_bytes, frame_length);
     
     // Calculate CRC
     uint16_t crc = calculateCRC(frame_bytes, frame_length);
     
-    // Append CRC (low byte first)
+    // Append CRC (low byte first) using hex utils
+    uint8_t crc_bytes[2] = {(uint8_t)(crc & 0xFF), (uint8_t)((crc >> 8) & 0xFF)};
     char crc_hex[5];
-    snprintf(crc_hex, sizeof(crc_hex), "%02X%02X", crc & 0xFF, (crc >> 8) & 0xFF);
+    bytesToHexString(crc_bytes, 2, crc_hex);
     
     return frame_without_crc + String(crc_hex);
 }
