@@ -12,6 +12,7 @@
 #include "sdkconfig.h"
 #include "esp_pm.h"
 #include "driver/uart.h"
+#include "disable_unused_peripherals.h"
 
 #if !CONFIG_AUTOSTART_ARDUINO
 
@@ -61,6 +62,17 @@ void setup() {
         // Non-critical, continue without event logging
     } else {
         Serial.println(F("Event logger initialized"));
+    }
+
+    // Disable unused peripherals to save power
+    PeripheralKiller::disableAll();
+
+    if (PeripheralKiller::checkAllDisabled()) {
+        Serial.println("All peripherals disabled successfully.");
+        log_event("PERIPHERALS_DISABLED", "All unused peripherals disabled");
+    } else {
+        Serial.println("Warning: One or more peripherals failed to disable.");
+        log_event("PERIPHERAL_DISABLE_FAIL", "Some peripherals failed to disable");
     }
     
     nonceManager.begin();
