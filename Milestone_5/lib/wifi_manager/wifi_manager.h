@@ -8,5 +8,7 @@
 // Function prototypes
 bool wifi_init(void);
 bool wifi_is_connected(void);
+void wifi_enable_modem_sleep(void);
+void wifi_disable_modem_sleep(void);
 
 #endif

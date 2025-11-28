@@ -29,3 +29,23 @@ bool wifi_init(void) {
 bool wifi_is_connected(void) {
     return WiFi.status() == WL_CONNECTED;
 }
+
+void wifi_enable_modem_sleep(void) {
+    // Enable modem sleep mode for WiFi power saving
+    // In modem sleep, the WiFi modem is turned off between DTIM beacon intervals
+    // This saves power while maintaining the WiFi connection
+    if (WiFi.setSleep(true)) {
+        Serial.println("WiFi modem sleep enabled");
+    } else {
+        Serial.println("Failed to enable WiFi modem sleep");
+    }
+}
+
+void wifi_disable_modem_sleep(void) {
+    // Disable modem sleep for full WiFi performance
+    if (WiFi.setSleep(false)) {
+        Serial.println("WiFi modem sleep disabled");
+    } else {
+        Serial.println("Failed to disable WiFi modem sleep");
+    }
+}

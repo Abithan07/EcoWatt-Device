@@ -43,6 +43,7 @@ void applyPMConfig(int minFreq, int maxFreq, bool enableLightSleep = false) {
     }
 }
 
+
 void setup() {
     Serial.begin(SERIAL_BAUD_RATE);
     Serial.println(F("EcoWatt Device - Milestone 5"));
@@ -65,6 +66,7 @@ void setup() {
     }
 
     // Disable unused peripherals to save power
+    #if DISABLE_UNUSED_PERIPHERALS
     PeripheralKiller::disableAll();
 
     if (PeripheralKiller::checkAllDisabled()) {
@@ -74,6 +76,7 @@ void setup() {
         Serial.println("Warning: One or more peripherals failed to disable.");
         log_event("PERIPHERAL_DISABLE_FAIL", "Some peripherals failed to disable");
     }
+    #endif
     
     nonceManager.begin();
     
@@ -86,6 +89,11 @@ void setup() {
         ESP.restart();
     }
     mark_validation_checkpoint(1);  // WiFi connected
+    
+    // Enable WiFi modem sleep for power saving
+    #if MODEM_SLEEP
+    wifi_enable_modem_sleep();
+    #endif
     
     // Initialize ConfigManager
     if (!config_manager_init()) {

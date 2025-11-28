@@ -6,9 +6,11 @@
 
 #define POWER_MANAGMENT 1
 #define DVFS 1
-#define LIGHT_SLEEP 1
+#define LIGHT_SLEEP 0
+#define MODEM_SLEEP 1
 #define IDLE_DELAY 0
 #define SERIAL_GATING 0
+#define DISABLE_UNUSED_PERIPHERALS 1
 
 // WiFi credentials
 #define WIFI_SSID "Jazoolee_PC"
