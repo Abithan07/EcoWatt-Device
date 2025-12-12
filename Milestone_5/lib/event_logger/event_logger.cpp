@@ -102,7 +102,7 @@ bool log_event(const String& message, const String& context) {
     serializeJsonPretty(doc, file);
     file.close();
     
-    Serial.printf("[EVENT_LOG] ✅ Logged: %s", message.c_str());
+    Serial.printf("[EVENT_LOG]  Logged: %s", message.c_str());
     if (context.length() > 0) {
         Serial.printf(" (%s)", context.c_str());
     }

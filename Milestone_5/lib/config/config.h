@@ -13,8 +13,8 @@
 #define DISABLE_UNUSED_PERIPHERALS 1
 
 // WiFi credentials
-#define WIFI_SSID "Jazoolee_PC"
-#define WIFI_PASSWORD ""
+#define WIFI_SSID "Abithan’s iPhone"
+#define WIFI_PASSWORD "155783155783"
 #define WIFI_CONNECT_TIMEOUT_MS 10000
 #define WIFI_RETRY_DELAY_MS 5000
 
@@ -23,7 +23,7 @@
 #define API_KEY "NjhhZWIwNDU1ZDdmMzg3MzNiMTQ5YWQzOjY4YWViMDQ1NWQ3ZjM4NzMzYjE0OWFjOQ=="
 
 // Cloud Upload API Configuration  
-#define UPLOAD_API_BASE_URL "https://eco-watt-cloud.vercel.app"
+#define UPLOAD_API_BASE_URL "http://172.20.10.5:3000"
 #define UPLOAD_API_KEY "ColdPlay2025"
 #define NTP_SERVER "pool.ntp.org"
 #define UPLOAD_PSK "ColdPlay@EcoWatt2025"

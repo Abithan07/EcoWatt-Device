@@ -692,6 +692,28 @@ void execute_upload_task(void) {
                     config_apply_pending_changes();
                     apply_success = true;
                     Serial.println(F("[CONFIG] Configuration applied successfully"));
+                    
+                    // CRITICAL: Reset task timing to apply new intervals immediately
+                    // Without this, old intervals continue until their period expires
+                    unsigned long now = millis();
+                    tasks[TASK_READ_REGISTERS].last_run_ms = now;
+                    tasks[TASK_UPLOAD_DATA].last_run_ms = now;
+                    tasks[TASK_COMMAND_HANDLING].last_run_ms = now;
+                    
+                    // Force interval update from new config
+                    uint32_t new_sampling = config_get_sampling_interval_ms();
+                    uint32_t new_upload = config_get_upload_interval_ms();
+                    tasks[TASK_READ_REGISTERS].interval_ms = new_sampling;
+                    tasks[TASK_UPLOAD_DATA].interval_ms = new_upload;
+                    tasks[TASK_COMMAND_HANDLING].interval_ms = new_upload;
+                    
+                    Serial.printf("[CONFIG] New intervals applied: Sampling=%ums, Upload=%ums\n", 
+                                 new_sampling, new_upload);
+                    
+                    // Trigger buffer reallocation on next loop by resetting tracking variables
+                    last_upload_interval = 0;
+                    last_sampling_interval = 0;
+                    
                 } catch (...) {
                     Serial.println(F("[CONFIG] ERROR: Exception during config application"));
                 }
@@ -820,13 +842,16 @@ void send_write_command_ack(const String& status, const String& error_code, cons
     String response = json_api_send_request(url, method, api_key, json_payload);
     
     if (response.length() > 0 && response.indexOf("success") >= 0) {
-        Serial.println(F("[COMMAND] ✅ Write command ACK sent successfully"));
+        Serial.println(F("[COMMAND]  Write command ACK sent successfully"));
     } else {
-        Serial.println(F("[COMMAND] ❌ Write command ACK failed"));
+        Serial.println(F("[COMMAND]    Write command ACK failed"));
     }
 }
 
 void execute_command_task(void) {
+    // Feed watchdog before executing command
+    esp_task_wdt_reset();
+
     Serial.println(F("Executing command task..."));
 
     // FIXED: Always attempt to send result if available

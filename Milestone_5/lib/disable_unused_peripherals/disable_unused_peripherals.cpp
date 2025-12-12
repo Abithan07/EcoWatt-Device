@@ -1,24 +1,5 @@
 #include "disable_unused_peripherals.h"
 
-/**
- * CONSERVATIVE PERIPHERAL DISABLING
- * 
- * This implementation ONLY disables peripherals that are:
- * 1. Definitely not used by the application
- * 2. Safe to disable without affecting WiFi or system stability
- * 
- * WHAT WE DISABLE:
- * - PWM/LEDC: Not controlling any outputs in this application
- * - RMT: Not using WS2812 LEDs or IR communication
- * - Touch Sensors: Not using capacitive touch inputs
- * 
- * WHAT WE KEEP ENABLED (DO NOT TOUCH):
- * - SPI: WiFi radio depends on internal SPI communication
- * - I2C: May be used by external sensors (safe to keep enabled)
- * - ADC: May be used for voltage monitoring (safe to keep enabled)
- * - Bluetooth: Never initialized, calling btStop() can cause crashes
- * - UART: Serial communication and debugging
- */
 
 void PeripheralKiller::disableAll() {
     Serial.println(F("[PERIPHERAL] Starting conservative peripheral power-down..."));

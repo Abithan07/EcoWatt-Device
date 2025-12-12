@@ -4,27 +4,34 @@
 const char* ConfigManager::NVS_NAMESPACE = "device_config";
 ConfigManager* g_config_manager = nullptr;
 
-// Register name to address mapping
+// Register name to address mapping (with aliases for convenience)
 static const struct {
     const char* name;
     uint16_t address;
 } REGISTER_MAP[] = {
-    {"voltage", 0x0000},
-    {"current", 0x0001},
-    {"power", 0x0002},
-    {"energy", 0x0003},
-    {"frequency", 0x0004},
-    {"power_factor", 0x0005},
-    {"temperature", 0x0006},
-    {"humidity", 0x0007},
-    {"export_power", 0x0008},
-    {"import_power", 0x0009}
+    {"phase_voltage", 0x0000},
+    {"voltage", 0x0000},              // Alias for phase_voltage
+    {"phase_current", 0x0001},
+    {"current", 0x0001},              // Alias for phase_current
+    {"phase_frequency", 0x0002},
+    {"frequency", 0x0002},            // Alias for phase_frequency
+    {"pv1_voltage", 0x0003},
+    {"pv2_voltage", 0x0004},
+    {"pv1_current", 0x0005},
+    {"pv2_current", 0x0006},
+    {"inverter_temperature", 0x0007},
+    {"temperature", 0x0007},          // Alias for inverter_temperature
+    {"export_power_percentage", 0x0008},
+    {"export_power", 0x0008},         // Alias for export_power_percentage
+    {"output_power", 0x0009},
+    {"power", 0x0009}                 // Alias for output_power
 };
 static const size_t REGISTER_MAP_SIZE = sizeof(REGISTER_MAP) / sizeof(REGISTER_MAP[0]);
 
 // Semaphore timeout to prevent deadlocks
 static const TickType_t CONFIG_MUTEX_TIMEOUT = pdMS_TO_TICKS(1000); // 1 second timeout
 
+//construtor
 ConfigManager::ConfigManager() : initialized(false), config_mutex(nullptr), has_pending_config(false) {
     // Set validation limits
     limits.min_sampling_ms = 1000;     // 1 second minimum
@@ -36,6 +43,7 @@ ConfigManager::ConfigManager() : initialized(false), config_mutex(nullptr), has_
     set_default_config();
 }
 
+// destructor - manual garbage collection
 ConfigManager::~ConfigManager() {
     if (config_mutex != nullptr) {
         vSemaphoreDelete(config_mutex);
@@ -49,12 +57,12 @@ void ConfigManager::set_default_config() {
     current_config.slave_address = SLAVE_ADDRESS;
     current_config.register_count = 4;
     
-    // Default registers: voltage, current, power, frequency
-    current_config.active_registers[0] = 0x0000; // voltage
-    current_config.active_registers[1] = 0x0001; // current
-    current_config.active_registers[2] = 0x0002; // power
-    current_config.active_registers[3] = 0x0004; // frequency
-    
+    // Default registers: Phase Voltage, Phase Current, Phase Frequency, Output Power
+    current_config.active_registers[0] = 0x0000; // phase_voltage
+    current_config.active_registers[1] = 0x0001; // phase_current
+    current_config.active_registers[2] = 0x0002; // phase_frequency
+    current_config.active_registers[3] = 0x0009; // output_power
+
     current_config.config_valid = true;
 }
 
@@ -66,24 +74,24 @@ bool ConfigManager::init() {
     // Create mutex
     config_mutex = xSemaphoreCreateMutex();
     if (config_mutex == nullptr) {
-        Serial.println(F("ConfigManager: Failed to create mutex"));
+        Serial.println(F("[ConfigManager]: Failed to create mutex"));
         return false;
     }
     
     // Initialize NVS
     if (!nvs.begin(NVS_NAMESPACE, false)) {
-        Serial.println(F("ConfigManager: Failed to initialize NVS"));
+        Serial.println(F("[ConfigManager]: Failed to initialize NVS"));
         return false;
     }
     
     // Load configuration from flash
     if (!load_from_flash()) {
-        Serial.println(F("ConfigManager: Using default configuration"));
+        Serial.println(F("[ConfigManager]: Using default configuration"));
         save_to_flash(); // Save defaults
     }
     
     initialized = true;
-    Serial.println(F("ConfigManager: Initialized successfully"));
+    Serial.println(F("[ConfigManager]: Initialized successfully"));
     return true;
 }
 
@@ -93,6 +101,7 @@ bool ConfigManager::load_from_flash() {
     }
     
     if (xSemaphoreTake(config_mutex, CONFIG_MUTEX_TIMEOUT) == pdTRUE) {
+        // reading each config parameter from NVS
         current_config.sampling_interval_ms = nvs.getUInt("sampling_ms", POLL_INTERVAL_MS);
         current_config.upload_interval_ms = nvs.getUInt("upload_ms", UPLOAD_INTERVAL_MS);
         current_config.slave_address = nvs.getUChar("slave_addr", SLAVE_ADDRESS);
@@ -292,11 +301,13 @@ String ConfigManager::process_cloud_config_update(const String& response) {
             return "";
         }
         
-        if (!doc["config_update"].is<JsonObject>()) {
+        // config_update_json is already the config_update object, not wrapped
+        if (!doc.is<JsonObject>()) {
+            Serial.println(F("[CONFIG] ERROR: Parsed JSON is not an object"));
             return "";
         }
         
-        JsonObject config_update = doc["config_update"];
+        JsonObject config_update = doc.as<JsonObject>();
         JsonDocument ack_doc;
         JsonArray accepted = ack_doc["accepted"].to<JsonArray>();
         JsonArray rejected = ack_doc["rejected"].to<JsonArray>();
@@ -317,12 +328,16 @@ String ConfigManager::process_cloud_config_update(const String& response) {
             uint32_t new_interval = config_update["sampling_interval"].as<uint32_t>() * 1000;
             if (!validate_sampling_interval(new_interval)) {
                 rejected.add("sampling_interval");
+                Serial.printf("[CONFIG] Sampling interval REJECTED: %ums\n", new_interval);
             } else if (current_config.sampling_interval_ms == new_interval) {
                 unchanged.add("sampling_interval");
+                Serial.printf("[CONFIG] Sampling interval unchanged: %ums\n", new_interval);
             } else {
                 pending_config.sampling_interval_ms = new_interval;
                 accepted.add("sampling_interval");
                 config_changed = true;
+                Serial.printf("[CONFIG] Sampling interval ACCEPTED: %u->%ums\n", 
+                             current_config.sampling_interval_ms, new_interval);
             }
         }
         
@@ -330,12 +345,16 @@ String ConfigManager::process_cloud_config_update(const String& response) {
             uint32_t new_interval = config_update["upload_interval"].as<uint32_t>() * 1000;
             if (!validate_upload_interval(new_interval)) {
                 rejected.add("upload_interval");
+                Serial.printf("[CONFIG] Upload interval REJECTED: %ums\n", new_interval);
             } else if (current_config.upload_interval_ms == new_interval) {
                 unchanged.add("upload_interval");
+                Serial.printf("[CONFIG] Upload interval unchanged: %ums\n", new_interval);
             } else {
                 pending_config.upload_interval_ms = new_interval;
                 accepted.add("upload_interval");
                 config_changed = true;
+                Serial.printf("[CONFIG] Upload interval ACCEPTED: %u->%ums\n", 
+                             current_config.upload_interval_ms, new_interval);
             }
         }
         
@@ -343,6 +362,7 @@ String ConfigManager::process_cloud_config_update(const String& response) {
             JsonArray registers = config_update["registers"];
             if (!validate_registers(registers)) {
                 rejected.add("registers");
+                Serial.println(F("[CONFIG] Registers validation FAILED"));
             } else {
                 bool registers_unchanged = (registers.size() == current_config.register_count);
                 if (registers_unchanged) {
@@ -358,6 +378,7 @@ String ConfigManager::process_cloud_config_update(const String& response) {
                 
                 if (registers_unchanged) {
                     unchanged.add("registers");
+                    Serial.println(F("[CONFIG] Registers unchanged"));
                 } else {
                     pending_config.register_count = registers.size();
                     for (size_t i = 0; i < registers.size(); i++) {
@@ -366,6 +387,7 @@ String ConfigManager::process_cloud_config_update(const String& response) {
                     }
                     accepted.add("registers");
                     config_changed = true;
+                    Serial.printf("[CONFIG] Registers ACCEPTED: %d registers\n", registers.size());
                 }
             }
         }
@@ -386,12 +408,17 @@ String ConfigManager::process_cloud_config_update(const String& response) {
         if (config_changed) {
             has_pending_config = true;
             Serial.println(F("[CONFIG] Configuration changes staged as pending"));
+        } else {
+            Serial.println(F("[CONFIG] No configuration changes detected (all unchanged/rejected)"));
         }
         
         xSemaphoreGive(config_mutex);
         
         // Generate and return the acknowledgment
-        return generate_config_ack(accepted, rejected, unchanged);
+        String ack = generate_config_ack(accepted, rejected, unchanged);
+        Serial.print(F("[CONFIG] ACK: "));
+        Serial.println(ack);
+        return ack;
     }
     
     return "";  // No config update found
