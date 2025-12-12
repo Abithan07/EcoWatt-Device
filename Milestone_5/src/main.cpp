@@ -13,6 +13,7 @@
 #include "esp_pm.h"
 #include "driver/uart.h"
 #include "disable_unused_peripherals.h"
+#include "fault_simulator.h"
 
 #if !CONFIG_AUTOSTART_ARDUINO
 
@@ -43,6 +44,37 @@ void applyPMConfig(int minFreq, int maxFreq, bool enableLightSleep = false) {
     }
 }
 
+void handle_fault_commands() {
+    if (Serial.available()) {
+        String cmd = Serial.readStringUntil('\n');
+        cmd.trim();
+        
+        if (cmd == "fn") {  // fault next
+            fault_simulator_trigger_next();
+            Serial.println("Next fault queued");
+            
+        } else if (cmd == "fe") {  // fault exception
+            fault_simulator_trigger_next_exception();
+            Serial.println("Next exception queued");
+            
+        } else if (cmd == "fc") {  // fault crc
+            fault_simulator_trigger(FAULT_CRC_ERROR);
+            Serial.println("CRC error queued");
+            
+        } else if (cmd == "fp") {  // fault packet drop
+            fault_simulator_trigger(FAULT_PACKET_DROP);
+            Serial.println("Packet drop queued");
+            
+        } else if (cmd == "fd") {  // fault delay
+            fault_simulator_trigger(FAULT_DELAY, EXCEPTION_ILLEGAL_FUNCTION, 5000);
+            Serial.println("5s delay queued");
+            
+        } else if (cmd == "fr") {  // fault reset
+            fault_simulator_reset();
+            Serial.println("Reset to normal");
+        }
+    }
+}
 
 void setup() {
     Serial.begin(SERIAL_BAUD_RATE);
@@ -147,6 +179,7 @@ void setup() {
 void loop() {
     // Run the scheduler (handles all periodic tasks)
     scheduler_run();
+    handle_fault_commands();
     
     // Process HTTP configuration requests
     // Configuration processing is now integrated with cloud upload responses
