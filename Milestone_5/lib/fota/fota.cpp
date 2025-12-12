@@ -468,14 +468,14 @@ bool perform_FOTA_with_manifest(int job_id,
   prefs.putULong("offset", 0);
   prefs.end();
 
-  // SUCCESS - Log final event
+  // Log final event
   Serial.println("[FOTA] Firmware validated and ready");
   append_fota_event("INFO", "FOTA_SUCCESS");
   
   unsigned long duration = millis() - startMillis;
   finalize_and_upload_fota_log(jobIdStr, "SUCCESS", duration);
   
-  // ===== FOTA ROLLBACK: Reset boot counter before restart =====
+  //FOTA ROLLBACK: Reset boot counter before restart 
   reset_boot_counter_for_new_firmware();
   
   return true;
