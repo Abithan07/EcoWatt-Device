@@ -65,22 +65,10 @@ void setup() {
         Serial.println(F("Event logger initialized"));
     }
 
-    // Disable unused peripherals to save power
-    #if DISABLE_UNUSED_PERIPHERALS
-    PeripheralKiller::disableAll();
-
-    if (PeripheralKiller::checkAllDisabled()) {
-        Serial.println("All peripherals disabled successfully.");
-        log_event("PERIPHERALS_DISABLED", "All unused peripherals disabled");
-    } else {
-        Serial.println("Warning: One or more peripherals failed to disable.");
-        log_event("PERIPHERAL_DISABLE_FAIL", "Some peripherals failed to disable");
-    }
-    #endif
-    
     nonceManager.begin();
     
-    // Initialize WiFi
+    // Initialize WiFi FIRST (before disabling peripherals)
+    // WiFi needs SPI and other peripherals to be intact
     if (!wifi_init()) {
         log_error(ERROR_WIFI_DISCONNECTED, "Failed to initialize WiFi");
         log_event("WIFI_INIT_FAIL", "Cannot connect to WiFi, restarting");
@@ -89,6 +77,21 @@ void setup() {
         ESP.restart();
     }
     mark_validation_checkpoint(1);  // WiFi connected
+    
+    // Disable unused peripherals to save power (AFTER WiFi is initialized)
+    // This uses a conservative approach - only disables peripherals that are
+    // definitely not needed: Touch sensors, PWM/LEDC, and RMT
+    #if DISABLE_UNUSED_PERIPHERALS
+    PeripheralKiller::disableAll();
+
+    if (PeripheralKiller::checkAllDisabled()) {
+        Serial.println(F("[PERIPHERAL] All targeted peripherals disabled successfully."));
+        log_event("PERIPHERALS_DISABLED", "Unused peripherals disabled (PWM, RMT, Touch)");
+    } else {
+        Serial.println(F("[PERIPHERAL] Warning: One or more peripherals failed to disable."));
+        log_event("PERIPHERAL_DISABLE_WARN", "Some peripherals may still be active");
+    }
+    #endif
     
     // Enable WiFi modem sleep for power saving
     #if MODEM_SLEEP
