@@ -35,7 +35,7 @@ String bytesToHexString(const uint8_t* data, size_t len) {
     
     char hex[3];
     for (size_t i = 0; i < len; i++) {
-        snprintf(hex, 3, "%02X", data[i]);
+        snprintf(hex, 3, "%02x", data[i]);  // Use lowercase 'x' for lowercase hex output
         result += hex;
     }
     
